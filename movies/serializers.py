@@ -17,9 +17,11 @@ class MovieSerializer(serializers.ModelSerializer):
             "overview",
             "poster_path",
             "runtime",
+            "genres",
             "watched",
             "in_watchlist",
             "favorite",
+            
         ]
 
     def get_watched(self, obj):

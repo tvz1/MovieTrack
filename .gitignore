@@ -1,7 +1,22 @@
-.venv/
-_pycache_/
-*.pyc
-db.sqlite3
+# Secrets
 .env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Django local files
+db.sqlite3
+staticfiles/
+
+# Database backup
+movietrack_backup.json
+
+# IDE / OS
 .vscode/
 .idea/
+.DS_Store
+Thumbs.db
