@@ -1,9 +1,13 @@
 from collections import Counter
 from datetime import timedelta
+import hashlib
+import secrets
 
 import requests
 
 from django.conf import settings
+from django.contrib.auth.models import User
+from django.core.mail import send_mail
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
@@ -13,7 +17,7 @@ from rest_framework.generics import (
     RetrieveUpdateDestroyAPIView,
     CreateAPIView,
 )
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -24,6 +28,7 @@ from .models import (
     FavoriteMovie,
     WatchedEpisode,
     UserProfile,
+    PasswordResetCode,
 )
 
 from .serializers import (
@@ -629,6 +634,186 @@ class UnmarkWatchedView(APIView):
 # ==========================================================
 # AUTH / USER
 # ==========================================================
+
+class PasswordResetRequestView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        email = str(
+            request.data.get("email", "")
+        ).strip().lower()
+
+        # Always return the same message so the API does not reveal
+        # whether an account with this email exists.
+        generic_response = {
+            "message":
+                "If an account with that email exists, "
+                "a reset code has been sent."
+        }
+
+        if not email:
+            return Response(
+                {"error": "Email is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = (
+            User.objects
+            .filter(email__iexact=email)
+            .order_by("id")
+            .first()
+        )
+
+        if user is None:
+            return Response(
+                generic_response,
+                status=status.HTTP_200_OK,
+            )
+
+        # Invalidate older unused codes.
+        PasswordResetCode.objects.filter(
+            user=user,
+            used=False,
+        ).update(used=True)
+
+        code = f"{secrets.randbelow(1000000):06d}"
+        code_hash = hashlib.sha256(
+            code.encode("utf-8")
+        ).hexdigest()
+
+        PasswordResetCode.objects.create(
+            user=user,
+            code_hash=code_hash,
+            expires_at=(
+                timezone.now()
+                + timedelta(minutes=10)
+            ),
+        )
+
+        send_mail(
+            subject="WatchLibrary password reset code",
+            message=(
+                "Your WatchLibrary password reset code is:\n\n"
+                f"{code}\n\n"
+                "This code expires in 10 minutes. "
+                "If you did not request a password reset, "
+                "you can ignore this email."
+            ),
+            from_email=getattr(
+                settings,
+                "DEFAULT_FROM_EMAIL",
+                None,
+            ),
+            recipient_list=[user.email],
+            fail_silently=False,
+        )
+
+        return Response(
+            generic_response,
+            status=status.HTTP_200_OK,
+        )
+
+
+class PasswordResetConfirmView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        email = str(
+            request.data.get("email", "")
+        ).strip().lower()
+
+        code = str(
+            request.data.get("code", "")
+        ).strip()
+
+        new_password = str(
+            request.data.get("new_password", "")
+        )
+
+        if not email or not code or not new_password:
+            return Response(
+                {
+                    "error":
+                        "Email, code and new password are required."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if (
+            len(code) != 6
+            or not code.isdigit()
+        ):
+            return Response(
+                {"error": "Invalid or expired reset code."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if len(new_password) < 8:
+            return Response(
+                {
+                    "error":
+                        "Password must contain at least 8 characters."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = (
+            User.objects
+            .filter(email__iexact=email)
+            .order_by("id")
+            .first()
+        )
+
+        if user is None:
+            return Response(
+                {"error": "Invalid or expired reset code."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        code_hash = hashlib.sha256(
+            code.encode("utf-8")
+        ).hexdigest()
+
+        reset = (
+            PasswordResetCode.objects
+            .filter(
+                user=user,
+                code_hash=code_hash,
+                used=False,
+                expires_at__gt=timezone.now(),
+            )
+            .order_by("-created_at")
+            .first()
+        )
+
+        if reset is None:
+            return Response(
+                {"error": "Invalid or expired reset code."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user.set_password(new_password)
+        user.save(update_fields=["password"])
+
+        reset.used = True
+        reset.save(update_fields=["used"])
+
+        PasswordResetCode.objects.filter(
+            user=user,
+            used=False,
+        ).update(used=True)
+
+        return Response(
+            {
+                "message":
+                    "Password changed successfully. "
+                    "You can now sign in."
+            },
+            status=status.HTTP_200_OK,
+        )
+
 
 class RegisterView(CreateAPIView):
     serializer_class = RegisterSerializer

@@ -32,9 +32,7 @@ class UserProfile(models.Model):
     )
 
     def __str__(self):
-        return (
-            f"{self.user.username} profile"
-        )
+        return f"{self.user.username} profile"
 
 
 class Movie(models.Model):
@@ -52,31 +50,31 @@ class Movie(models.Model):
     )
 
     title = models.CharField(
-        max_length=255
+        max_length=255,
     )
 
     release_date = models.DateField(
         null=True,
-        blank=True
+        blank=True,
     )
 
     overview = models.TextField(
-        blank=True
+        blank=True,
     )
 
     poster_path = models.CharField(
         max_length=500,
-        blank=True
+        blank=True,
     )
 
     runtime = models.PositiveIntegerField(
         null=True,
-        blank=True
+        blank=True,
     )
 
     genres = models.JSONField(
         default=list,
-        blank=True
+        blank=True,
     )
 
     class Meta:
@@ -111,7 +109,7 @@ class WatchedMovie(models.Model):
     )
 
     watched_at = models.DateTimeField(
-        auto_now_add=True
+        auto_now_add=True,
     )
 
     class Meta:
@@ -146,7 +144,7 @@ class WatchlistMovie(models.Model):
     )
 
     added_at = models.DateTimeField(
-        auto_now_add=True
+        auto_now_add=True,
     )
 
     class Meta:
@@ -181,7 +179,7 @@ class FavoriteMovie(models.Model):
     )
 
     added_at = models.DateTimeField(
-        auto_now_add=True
+        auto_now_add=True,
     )
 
     class Meta:
@@ -354,4 +352,37 @@ class WatchedEpisode(models.Model):
         return (
             f"{self.user.username} - "
             f"{self.episode}"
+        )
+
+
+class PasswordResetCode(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="password_reset_codes",
+    )
+
+    code_hash = models.CharField(
+        max_length=64,
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+    )
+
+    expires_at = models.DateTimeField()
+
+    used = models.BooleanField(
+        default=False,
+    )
+
+    class Meta:
+        ordering = [
+            "-created_at"
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.user.username} - "
+            f"{self.created_at}"
         )

@@ -17,6 +17,8 @@ from .views import (
     MovieFullDetailView,
     ProfileView,
     MovieFilterOptionsView,
+    PasswordResetRequestView,
+    PasswordResetConfirmView,
 )
 
 from .catalog_views import (
@@ -42,48 +44,108 @@ from .episode_views import (
 
 
 urlpatterns = [
-    path("", MovieListView.as_view(), name="movie-list"),
-    path("catalog/", MovieCatalogView.as_view(), name="movie-catalog"),
-    path("register/", RegisterView.as_view(), name="register"),
-    path("me/", MeView.as_view(), name="me"),
-    path("profile/", ProfileView.as_view(), name="profile"),
+    path(
+        "",
+        MovieListView.as_view(),
+        name="movie-list",
+    ),
+
+    path(
+        "catalog/",
+        MovieCatalogView.as_view(),
+        name="movie-catalog",
+    ),
+
+    path(
+        "register/",
+        RegisterView.as_view(),
+        name="register",
+    ),
+
+    path(
+        "me/",
+        MeView.as_view(),
+        name="me",
+    ),
+
+    path(
+        "profile/",
+        ProfileView.as_view(),
+        name="profile",
+    ),
+
+    path(
+        "password-reset/request/",
+        PasswordResetRequestView.as_view(),
+        name="password-reset-request",
+    ),
+
+    path(
+        "password-reset/confirm/",
+        PasswordResetConfirmView.as_view(),
+        name="password-reset-confirm",
+    ),
+
     path(
         "filter-options/",
         MovieFilterOptionsView.as_view(),
         name="movie-filter-options",
     ),
-    path("search/", MovieSearchView.as_view(), name="media-search"),
 
-    path("watched/", WatchedMovieListView.as_view(), name="watched-list"),
+    path(
+        "search/",
+        MovieSearchView.as_view(),
+        name="media-search",
+    ),
+
+    path(
+        "watched/",
+        WatchedMovieListView.as_view(),
+        name="watched-list",
+    ),
+
     path(
         "<int:movie_id>/watched/",
         MarkWatchedView.as_view(),
         name="media-watched",
     ),
+
     path(
         "<int:movie_id>/watched/remove/",
         UnmarkWatchedView.as_view(),
         name="media-unwatched",
     ),
 
-    path("watchlist/", WatchlistView.as_view(), name="watchlist"),
+    path(
+        "watchlist/",
+        WatchlistView.as_view(),
+        name="watchlist",
+    ),
+
     path(
         "<int:movie_id>/watchlist/",
         WatchlistView.as_view(),
         name="watchlist-add",
     ),
+
     path(
         "<int:movie_id>/watchlist/remove/",
         RemoveFromWatchlistView.as_view(),
         name="watchlist-remove",
     ),
 
-    path("favorites/", FavoriteView.as_view(), name="favorites"),
+    path(
+        "favorites/",
+        FavoriteView.as_view(),
+        name="favorites",
+    ),
+
     path(
         "<int:movie_id>/favorite/",
         FavoriteView.as_view(),
         name="favorite-add",
     ),
+
     path(
         "<int:movie_id>/favorite/remove/",
         RemoveFavoriteView.as_view(),
@@ -95,6 +157,7 @@ urlpatterns = [
         MovieImportView.as_view(),
         name="media-import",
     ),
+
     path(
         "import/<int:tmdb_id>/",
         MovieImportView.as_view(),
@@ -106,26 +169,31 @@ urlpatterns = [
         TVSeasonDetailView.as_view(),
         name="tv-season-detail",
     ),
+
     path(
         "episodes/<int:episode_id>/watched/",
         MarkEpisodeWatchedView.as_view(),
         name="episode-watched",
     ),
+
     path(
         "episodes/<int:episode_id>/watched/remove/",
         UnmarkEpisodeWatchedView.as_view(),
         name="episode-unwatched",
     ),
+
     path(
         "seasons/<int:season_id>/watched/",
         MarkSeasonWatchedView.as_view(),
         name="season-watched",
     ),
+
     path(
         "seasons/<int:season_id>/watched/remove/",
         UnmarkSeasonWatchedView.as_view(),
         name="season-unwatched",
     ),
+
     path(
         "tv/<int:tmdb_id>/progress/",
         SeriesProgressView.as_view(),
@@ -137,6 +205,7 @@ urlpatterns = [
         MovieFullDetailView.as_view(),
         name="media-full-detail",
     ),
+
     path(
         "tmdb/<int:tmdb_id>/",
         MovieFullDetailView.as_view(),
@@ -148,6 +217,7 @@ urlpatterns = [
         MovieRecommendationsView.as_view(),
         name="media-recommendations",
     ),
+
     path(
         "tmdb/<int:tmdb_id>/recommendations/",
         MovieRecommendationsView.as_view(),
