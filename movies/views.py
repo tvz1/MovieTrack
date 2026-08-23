@@ -1,3 +1,4 @@
+from collections import Counter
 from datetime import timedelta
 
 import requests
@@ -1633,43 +1634,37 @@ class ProfileView(APIView):
             )
         )
 
-        watched_count = (
+        watched_qs = (
             WatchedMovie.objects
-            .filter(
-                user=user
-            )
-            .count()
+            .filter(user=user)
+            .select_related("movie")
         )
+
+        watched_count = watched_qs.count()
 
         watchlist_count = (
             WatchlistMovie.objects
-            .filter(
-                user=user
-            )
+            .filter(user=user)
             .count()
         )
 
         favorite_count = (
             FavoriteMovie.objects
-            .filter(
-                user=user
-            )
+            .filter(user=user)
             .count()
         )
 
         movies_watched = (
-            WatchedMovie.objects
+            watched_qs
             .filter(
-                user=user,
                 movie__media_type="movie",
             )
             .count()
         )
 
         series_watched = (
-            WatchedMovie.objects
+            watched_qs
             .filter(
-                user=user,
                 movie__media_type="tv",
             )
             .count()
@@ -1677,11 +1672,48 @@ class ProfileView(APIView):
 
         episodes_watched = (
             WatchedEpisode.objects
-            .filter(
-                user=user
-            )
+            .filter(user=user)
             .count()
         )
+
+        genre_counter = Counter()
+
+        for watched_item in watched_qs:
+            for genre in (
+                watched_item.movie.genres
+                or []
+            ):
+                genre_name = (
+                    str(genre).strip()
+                )
+
+                if genre_name:
+                    genre_counter[
+                        genre_name
+                    ] += 1
+
+        favorite_genres = []
+
+        for genre, count in (
+            genre_counter
+            .most_common(3)
+        ):
+            percentage = (
+                round(
+                    count
+                    / watched_count
+                    * 100
+                )
+                if watched_count
+                else 0
+            )
+
+            favorite_genres.append({
+                "name": genre,
+                "count": count,
+                "percentage":
+                    percentage,
+            })
 
         return Response({
             "id":
@@ -1695,6 +1727,12 @@ class ProfileView(APIView):
 
             "avatar":
                 profile.avatar,
+
+            "member_since":
+                user.date_joined
+                .strftime(
+                    "%B %Y"
+                ),
 
             "watched_count":
                 watched_count,
@@ -1713,6 +1751,9 @@ class ProfileView(APIView):
 
             "episodes_watched":
                 episodes_watched,
+
+            "favorite_genres":
+                favorite_genres,
         })
 
     def post(self, request):
