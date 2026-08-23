@@ -12,6 +12,7 @@ class MovieSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "tmdb_id",
+            "media_type",
             "title",
             "release_date",
             "overview",
