@@ -20,3 +20,6 @@ movietrack_backup.json
 .idea/
 .DS_Store
 Thumbs.db
+
+render_data.json
+movietrack_backup.json

@@ -22,6 +22,7 @@ from .models import (
     WatchlistMovie,
     FavoriteMovie,
     WatchedEpisode,
+    UserProfile,
 )
 
 from .serializers import (
@@ -1608,8 +1609,29 @@ class ProfileView(APIView):
         IsAuthenticated
     ]
 
+    AVATAR_NAMES = {
+        "horror",
+        "action",
+        "sci_fi",
+        "fantasy",
+        "thriller",
+        "comedy",
+        "drama",
+        "romance",
+        "animation",
+        "adventure",
+        "mystery",
+        "western",
+    }
+
     def get(self, request):
         user = request.user
+
+        profile, _ = (
+            UserProfile.objects.get_or_create(
+                user=user
+            )
+        )
 
         watched_count = (
             WatchedMovie.objects
@@ -1671,6 +1693,9 @@ class ProfileView(APIView):
             "email":
                 user.email,
 
+            "avatar":
+                profile.avatar,
+
             "watched_count":
                 watched_count,
 
@@ -1688,6 +1713,43 @@ class ProfileView(APIView):
 
             "episodes_watched":
                 episodes_watched,
+        })
+
+    def post(self, request):
+        avatar = (
+            request.query_params
+            .get(
+                "avatar",
+                "",
+            )
+            .strip()
+            .lower()
+        )
+
+        if avatar not in self.AVATAR_NAMES:
+            return Response(
+                {
+                    "error":
+                        "Invalid avatar."
+                },
+                status=400,
+            )
+
+        profile, _ = (
+            UserProfile.objects.get_or_create(
+                user=request.user
+            )
+        )
+
+        profile.avatar = avatar
+        profile.save(
+            update_fields=[
+                "avatar"
+            ]
+        )
+
+        return Response({
+            "avatar": profile.avatar
         })
 
 

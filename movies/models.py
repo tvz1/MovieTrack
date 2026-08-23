@@ -2,6 +2,41 @@ from django.db import models
 from django.contrib.auth.models import User
 
 
+class UserProfile(models.Model):
+    AVATAR_CHOICES = [
+        ("horror", "Horror"),
+        ("action", "Action"),
+        ("sci_fi", "Sci-Fi"),
+        ("fantasy", "Fantasy"),
+        ("thriller", "Thriller"),
+        ("comedy", "Comedy"),
+        ("drama", "Drama"),
+        ("romance", "Romance"),
+        ("animation", "Animation"),
+        ("adventure", "Adventure"),
+        ("mystery", "Mystery"),
+        ("western", "Western"),
+    ]
+
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name="watchlibrary_profile",
+    )
+
+    avatar = models.CharField(
+        max_length=20,
+        choices=AVATAR_CHOICES,
+        blank=True,
+        default="",
+    )
+
+    def __str__(self):
+        return (
+            f"{self.user.username} profile"
+        )
+
+
 class Movie(models.Model):
     MEDIA_TYPE_CHOICES = [
         ("movie", "Movie"),
@@ -167,10 +202,6 @@ class FavoriteMovie(models.Model):
         )
 
 
-# ==========================================================
-# TV SEASONS
-# ==========================================================
-
 class TVSeason(models.Model):
     series = models.ForeignKey(
         Movie,
@@ -229,10 +260,6 @@ class TVSeason(models.Model):
             f"Season {self.season_number}"
         )
 
-
-# ==========================================================
-# TV EPISODES
-# ==========================================================
 
 class TVEpisode(models.Model):
     season = models.ForeignKey(
@@ -294,10 +321,6 @@ class TVEpisode(models.Model):
             f"{self.name}"
         )
 
-
-# ==========================================================
-# WATCHED EPISODES
-# ==========================================================
 
 class WatchedEpisode(models.Model):
     user = models.ForeignKey(
