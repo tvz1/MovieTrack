@@ -1,6 +1,7 @@
 from collections import Counter
 from datetime import timedelta
 import hashlib
+import logging
 import secrets
 
 import requests
@@ -39,6 +40,9 @@ from .serializers import (
     RegisterSerializer,
     UserSerializer,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 def tmdb_headers():
@@ -691,23 +695,45 @@ class PasswordResetRequestView(APIView):
             ),
         )
 
-        send_mail(
-            subject="WatchLibrary password reset code",
-            message=(
-                "Your WatchLibrary password reset code is:\n\n"
-                f"{code}\n\n"
-                "This code expires in 10 minutes. "
-                "If you did not request a password reset, "
-                "you can ignore this email."
-            ),
-            from_email=getattr(
-                settings,
-                "DEFAULT_FROM_EMAIL",
-                None,
-            ),
-            recipient_list=[user.email],
-            fail_silently=False,
-        )
+        try:
+            send_mail(
+                subject="WatchLibrary password reset code",
+                message=(
+                    "Your WatchLibrary password reset code is:\n\n"
+                    f"{code}\n\n"
+                    "This code expires in 10 minutes. "
+                    "If you did not request a password reset, "
+                    "you can ignore this email."
+                ),
+                from_email=getattr(
+                    settings,
+                    "DEFAULT_FROM_EMAIL",
+                    None,
+                ),
+                recipient_list=[user.email],
+                fail_silently=False,
+            )
+        except Exception as exc:
+            logger.exception(
+                "Password reset email failed for user_id=%s: %s",
+                user.id,
+                exc,
+            )
+
+            PasswordResetCode.objects.filter(
+                user=user,
+                code_hash=code_hash,
+                used=False,
+            ).delete()
+
+            return Response(
+                {
+                    "error":
+                        "Email could not be sent. "
+                        "Please try again later."
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
 
         return Response(
             generic_response,
