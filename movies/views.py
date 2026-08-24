@@ -2,13 +2,13 @@ from collections import Counter
 from datetime import timedelta
 import hashlib
 import logging
+import os
 import secrets
 
 import requests
 
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.core.mail import send_mail
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
@@ -695,27 +695,86 @@ class PasswordResetRequestView(APIView):
             ),
         )
 
-        try:
-            send_mail(
-                subject="WatchLibrary password reset code",
-                message=(
-                    "Your WatchLibrary password reset code is:\n\n"
-                    f"{code}\n\n"
-                    "This code expires in 10 minutes. "
-                    "If you did not request a password reset, "
-                    "you can ignore this email."
-                ),
-                from_email=getattr(
-                    settings,
-                    "DEFAULT_FROM_EMAIL",
-                    None,
-                ),
-                recipient_list=[user.email],
-                fail_silently=False,
+        resend_api_key = os.getenv(
+            "RESEND_API_KEY",
+            "",
+        ).strip()
+
+        if not resend_api_key:
+            logger.error(
+                "RESEND_API_KEY is missing."
             )
-        except Exception as exc:
+
+            PasswordResetCode.objects.filter(
+                user=user,
+                code_hash=code_hash,
+                used=False,
+            ).delete()
+
+            return Response(
+                {
+                    "error":
+                        "Email service is not configured."
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        try:
+            resend_response = requests.post(
+                "https://api.resend.com/emails",
+                headers={
+                    "Authorization":
+                        f"Bearer {resend_api_key}",
+                    "Content-Type":
+                        "application/json",
+                },
+                json={
+                    "from":
+                        "WatchLibrary <onboarding@resend.dev>",
+                    "to": [
+                        user.email
+                    ],
+                    "subject":
+                        "WatchLibrary password reset code",
+                    "text": (
+                        "Your WatchLibrary password reset code is:\n\n"
+                        f"{code}\n\n"
+                        "This code expires in 10 minutes. "
+                        "If you did not request a password reset, "
+                        "you can ignore this email."
+                    ),
+                },
+                timeout=15,
+            )
+
+            if resend_response.status_code not in (
+                200,
+                201,
+            ):
+                logger.error(
+                    "Resend email failed. status=%s body=%s",
+                    resend_response.status_code,
+                    resend_response.text,
+                )
+
+                PasswordResetCode.objects.filter(
+                    user=user,
+                    code_hash=code_hash,
+                    used=False,
+                ).delete()
+
+                return Response(
+                    {
+                        "error":
+                            "Email could not be sent. "
+                            "Please try again later."
+                    },
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
+
+        except requests.RequestException as exc:
             logger.exception(
-                "Password reset email failed for user_id=%s: %s",
+                "Resend request failed for user_id=%s: %s",
                 user.id,
                 exc,
             )
