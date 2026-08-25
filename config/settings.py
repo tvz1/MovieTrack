@@ -3,6 +3,7 @@ Django settings for config project.
 """
 
 from pathlib import Path
+from datetime import timedelta
 import os
 
 import dj_database_url
@@ -379,6 +380,23 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
+}
+
+
+# =========================================================
+# SIMPLE JWT
+# =========================================================
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME":
+        timedelta(
+            minutes=15,
+        ),
+
+    "REFRESH_TOKEN_LIFETIME":
+        timedelta(
+            days=30,
+        ),
 }
 
 
