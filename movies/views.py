@@ -1726,18 +1726,24 @@ class MovieFullDetailView(APIView):
         )
 
         watched = False
+        watched_at = None
         in_watchlist = False
         favorite = False
 
         if local_movie:
-            watched = (
+            watched_item = (
                 WatchedMovie.objects
                 .filter(
                     user=request.user,
                     movie=local_movie,
                 )
-                .exists()
+                .first()
             )
+
+            watched = watched_item is not None
+
+            if watched_item:
+                watched_at = watched_item.watched_at
 
             in_watchlist = (
                 WatchlistMovie.objects
@@ -1835,6 +1841,8 @@ class MovieFullDetailView(APIView):
                 ),
             "watched":
                 watched,
+            "watched_at":
+                watched_at,
             "in_watchlist":
                 in_watchlist,
             "favorite":
