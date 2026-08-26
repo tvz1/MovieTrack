@@ -9,6 +9,7 @@ import requests
 
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.db import IntegrityError
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
@@ -210,7 +211,7 @@ class MovieSearchView(APIView):
                     "error":
                         "Could not connect to TMDb."
                 },
-                status=500,
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
         if response.status_code != 200:
@@ -412,7 +413,7 @@ class MovieImportView(APIView):
                     "error":
                         "Could not connect to TMDb."
                 },
-                status=500,
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
         if response.status_code != 200:
@@ -476,36 +477,97 @@ class MovieImportView(APIView):
                 "runtime"
             )
 
-        media, created = (
-            Movie.objects.update_or_create(
-                tmdb_id=data["id"],
-                media_type=media_type,
-                defaults={
-                    "title": title,
-                    "release_date":
-                        release_date,
-                    "overview":
-                        data.get(
-                            "overview",
-                            "",
-                        ),
-                    "poster_path":
-                        data.get(
-                            "poster_path"
-                        )
-                        or "",
-                    "runtime": runtime,
-                    "genres": [
-                        genre["name"]
-                        for genre
-                        in data.get(
-                            "genres",
-                            [],
-                        )
-                    ],
-                },
+        movie_defaults = {
+            "title": title,
+            "release_date":
+                release_date,
+            "overview":
+                data.get(
+                    "overview",
+                    "",
+                ),
+            "poster_path":
+                data.get(
+                    "poster_path"
+                )
+                or "",
+            "runtime": runtime,
+            "genres": [
+                genre.get("name", "")
+                for genre
+                in data.get(
+                    "genres",
+                    [],
+                )
+                if genre.get("name")
+            ],
+        }
+
+        try:
+            media, created = (
+                Movie.objects.update_or_create(
+                    tmdb_id=data["id"],
+                    media_type=media_type,
+                    defaults=movie_defaults,
+                )
             )
-        )
+
+        except IntegrityError:
+            # Dva gotovo istovremena importa istog filma/serije
+            # mogu se sudariti na unique constraintu.
+            logger.warning(
+                "Concurrent media import detected. "
+                "tmdb_id=%s media_type=%s",
+                data.get("id"),
+                media_type,
+            )
+
+            media = (
+                Movie.objects
+                .filter(
+                    tmdb_id=data["id"],
+                    media_type=media_type,
+                )
+                .first()
+            )
+
+            if media is None:
+                logger.exception(
+                    "Media import failed after IntegrityError. "
+                    "tmdb_id=%s media_type=%s",
+                    data.get("id"),
+                    media_type,
+                )
+
+                return Response(
+                    {
+                        "error":
+                            "Could not save item. "
+                            "Please try again."
+                    },
+                    status=
+                        status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
+
+            created = False
+
+        except Exception:
+            logger.exception(
+                "Unexpected media import error. "
+                "tmdb_id=%s media_type=%s",
+                data.get("id"),
+                media_type,
+            )
+
+            return Response(
+                {
+                    "error":
+                        "Could not save item. "
+                        "Please try again."
+                },
+                status=
+                    status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         serializer = MovieSerializer(
             media,
@@ -547,13 +609,64 @@ class MarkWatchedView(APIView):
             id=movie_id,
         )
 
-        watched_movie, created = (
-            WatchedMovie.objects
-            .get_or_create(
-                user=request.user,
-                movie=movie,
+        try:
+            watched_movie, created = (
+                WatchedMovie.objects
+                .get_or_create(
+                    user=request.user,
+                    movie=movie,
+                )
             )
-        )
+
+        except IntegrityError:
+            # Ako korisnik vrlo brzo pošalje isti request dvaput,
+            # unique constraint je već napravio zapis u drugom requestu.
+            watched_movie = (
+                WatchedMovie.objects
+                .filter(
+                    user=request.user,
+                    movie=movie,
+                )
+                .first()
+            )
+
+            if watched_movie is None:
+                logger.exception(
+                    "Could not recover watched item after "
+                    "IntegrityError. user_id=%s movie_id=%s",
+                    request.user.id,
+                    movie.id,
+                )
+
+                return Response(
+                    {
+                        "error":
+                            "Could not mark item as watched. "
+                            "Please try again."
+                    },
+                    status=
+                        status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
+
+            created = False
+
+        except Exception:
+            logger.exception(
+                "Unexpected watched error. "
+                "user_id=%s movie_id=%s",
+                request.user.id,
+                movie.id,
+            )
+
+            return Response(
+                {
+                    "error":
+                        "Could not mark item as watched. "
+                        "Please try again."
+                },
+                status=
+                    status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         serializer = (
             WatchedMovieSerializer(
@@ -1382,7 +1495,7 @@ class MovieCatalogView(APIView):
                         "Could not connect "
                         "to TMDb."
                 },
-                status=500,
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
         if response.status_code != 200:
@@ -1514,7 +1627,7 @@ class MovieFullDetailView(APIView):
                         "Could not connect "
                         "to TMDb."
                 },
-                status=500,
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
         if response.status_code != 200:
@@ -2136,7 +2249,7 @@ class MovieFilterOptionsView(APIView):
                         "Could not connect "
                         "to TMDb."
                 },
-                status=500,
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
         if (
